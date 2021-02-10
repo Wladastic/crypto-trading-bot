@@ -1,10 +1,5 @@
 # Crypto Trading Bot Fork from Haehnchen
 
-Note from Wladastic:
-I decided to fork this project to add my own features to it.
-
-
-
 [![Build Status](https://travis-ci.org/Haehnchen/crypto-trading-bot.svg?branch=master)](https://travis-ci.org/Haehnchen/crypto-trading-bot)
 
 A **work in progress** Cryptocurrency for common exchanges like Bitfinex, Bitmex and Binance.
