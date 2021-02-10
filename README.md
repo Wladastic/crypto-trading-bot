@@ -1,4 +1,4 @@
-# Crypto Trading Bot Fork from Haehnchen
+# Crypto Trading Bot
 
 [![Build Status](https://travis-ci.org/Haehnchen/crypto-trading-bot.svg?branch=master)](https://travis-ci.org/Haehnchen/crypto-trading-bot)
 
