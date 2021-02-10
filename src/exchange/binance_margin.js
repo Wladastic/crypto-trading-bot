@@ -297,13 +297,17 @@ module.exports = class BinanceMargin {
       .filter(
         s =>
           s.trade &&
-          ((s.trade.capital && s.trade.capital > 0) || (s.trade.currency_capital && s.trade.currency_capital > 0))
+          ((s.trade.capital && s.trade.capital > 0) ||
+            (s.trade.currency_capital && s.trade.currency_capital > 0) ||
+            (s.trade.strategies && s.trade.strategies.length > 0))
       )
       .forEach(s => {
         if (s.trade.capital > 0) {
           capitals[s.symbol] = s.trade.capital;
         } else if (s.trade.currency_capital > 0 && this.tickers[s.symbol] && this.tickers[s.symbol].bid) {
           capitals[s.symbol] = s.trade.currency_capital / this.tickers[s.symbol].bid;
+        } else {
+          capitals[s.symbol] = 0;
         }
       });
 
@@ -406,15 +410,18 @@ module.exports = class BinanceMargin {
       if (isRemoveEvent) {
         this.logger.info(`Binance Margin: Removing non open order: ${orderStatus} - ${JSON.stringify(event)}`);
         this.orderbag.delete(event.orderId);
+        this.throttler.addTask('binance_margin_sync_balances', this.syncBalances.bind(this), 500);
       }
 
       // sync all open orders and get entry based fire them in parallel
-      this.throttler.addTask('binance_margin_sync_orders', this.syncOrders());
+      this.throttler.addTask('binance_margin_sync_orders', this.syncOrders.bind(this));
 
       // set last order price to our trades. so we have directly profit and entry prices
       this.throttler.addTask(
         `binance_margin_sync_trades_for_entries_${event.symbol}`,
-        this.syncTradesForEntries([event.symbol]),
+        async () => {
+          await this.syncTradesForEntries([event.symbol]);
+        },
         300
       );
 
@@ -424,13 +431,12 @@ module.exports = class BinanceMargin {
       }
     }
 
-    // get balances and same them internally; allows to take open positions
-    // Format we get: balances: {'EOS': {"available": 12, "locked": 8}}
-    if (event.eventType && event.eventType === 'account' && 'balances' in event) {
-      // we dont get the margin information here;
-      // so we would only be able to calculate longs, so do a full sync on API
-
-      this.throttler.addTask('binance_margin_sync_balances', this.syncBalances());
+    // force balance update via api because:
+    // - "account": old api (once full update)
+    // - "outboundAccountPosition" given only delta
+    // - "balanceUpdate" given not balances
+    if (event.eventType && ['outboundAccountPosition', 'account', 'balanceUpdate'].includes(event.eventType)) {
+      this.throttler.addTask('binance_margin_sync_balances', this.syncBalances.bind(this), 300);
     }
   }
 
@@ -459,6 +465,7 @@ module.exports = class BinanceMargin {
     }
 
     if (!accountInfo || !accountInfo.userAssets) {
+      this.logger.error(`Binance Margin: invalid sync balances response: ${JSON.stringify(accountInfo)}`);
       return;
     }
 

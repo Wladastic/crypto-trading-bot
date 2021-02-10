@@ -5,21 +5,23 @@ module.exports = class Throttler {
   }
 
   addTask(key, func, timeout = 1000) {
-    if (!(func instanceof Promise)) {
-      throw new Error(`Throttler no async / promise function given: ${key}`);
+    if (func.constructor.name !== 'AsyncFunction') {
+      throw new Error(`Throttler no async function given: ${key}`);
     }
 
     if (key in this.tasks) {
-      this.logger.debug(`Throttler clear existing event: ${key} - ${timeout}ms`);
-
-      clearTimeout(this.tasks[key]);
-      delete this.tasks[key];
+      this.logger.debug(`Throttler already existing task: ${key} - ${timeout}ms`);
+      return;
     }
 
     const me = this;
     this.tasks[key] = setTimeout(async () => {
       delete me.tasks[key];
-      await Promise.resolve(func);
+      try {
+        await func();
+      } catch (e) {
+        me.logger.error(`Task error: ${key} - ${String(e)}`);
+      }
     }, timeout);
   }
 };
